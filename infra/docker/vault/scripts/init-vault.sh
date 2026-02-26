@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-VAULT_ADDR="http://localhost:8200"
-INIT_OUTPUT_FILE="./vault-init-keys.json"    # STORE THIS SECURELY (KMS, password manager, etc.)
-AGENT_DIR="./vault/agent"
+VAULT_ADDR="${VAULT_ADDR:-http://localhost:8200}"
+INIT_OUTPUT_FILE="${INIT_OUTPUT_FILE:-./vault-init-keys.json}"    # STORE THIS SECURELY
+AGENT_DIR="${AGENT_DIR:-./vault/agent}"
 
 echo "──────────────────────────────────────────"
 echo " Vault Init & Bootstrap"
@@ -18,12 +18,18 @@ done
 # ── 2. Initialise (only if not already initialised) ──
 STATUS=$(curl -s "${VAULT_ADDR}/v1/sys/init" | jq -r '.initialized')
 
-if [ "$STATUS" == "false" ]; then
+if [ "$STATUS" = "false" ]; then
   echo "Initialising Vault..."
-  curl -sf \
-    --request POST \
-    --data '{"secret_shares": 5, "secret_threshold": 3}' \
-    "${VAULT_ADDR}/v1/sys/init" | tee "${INIT_OUTPUT_FILE}" | jq .
+  # Try to use vault operator init if available (preferred over raw curl for better output)
+  if command -v vault >/dev/null 2>&1; then
+    vault operator init -key-shares=5 -key-threshold=3 -format=json > "${INIT_OUTPUT_FILE}"
+    cat "${INIT_OUTPUT_FILE}" | jq .
+  else
+    curl -sf \
+      --request POST \
+      --data '{"secret_shares": 5, "secret_threshold": 3}' \
+      "${VAULT_ADDR}/v1/sys/init" | tee "${INIT_OUTPUT_FILE}" | jq .
+  fi
 
   echo ""
   echo "⚠️  CRITICAL: Unseal keys and root token saved to ${INIT_OUTPUT_FILE}"
@@ -37,12 +43,18 @@ ROOT_TOKEN=$(jq -r '.root_token' "${INIT_OUTPUT_FILE}")
 KEYS=$(jq -r '.keys[]' "${INIT_OUTPUT_FILE}" | head -3)  # Need threshold (3) of 5
 
 echo "Unsealing Vault..."
-for key in $KEYS; do
-  curl -sf \
-    --request POST \
-    --data "{\"key\": \"${key}\"}" \
-    "${VAULT_ADDR}/v1/sys/unseal" | jq '.sealed'
-done
+if command -v vault >/dev/null 2>&1; then
+  for key in $KEYS; do
+    vault operator unseal "$key"
+  done
+else
+  for key in $KEYS; do
+    curl -sf \
+      --request POST \
+      --data "{\"key\": \"${key}\"}" \
+      "${VAULT_ADDR}/v1/sys/unseal" | jq '.sealed'
+  done
+fi
 
 export VAULT_TOKEN="${ROOT_TOKEN}"
 export VAULT_ADDR="${VAULT_ADDR}"

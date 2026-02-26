@@ -1,6 +1,9 @@
 # ── UI ─────────────────────────────────────────
 ui = true
 
+# Required as of Vault 1.20. In Docker, set true so memory isn't locked (avoids OOM with limited container RAM).
+disable_mlock = true
+
 # ── Storage (Raft — integrated, no external deps) ──
 storage "raft" {
   path    = "/vault/data"

@@ -26,8 +26,8 @@ services:
       - /Volumes/Expansion/var/opt/pgsql:/var/lib/postgresql/data:rw
 
       # Config & init
-      - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
-      - ./init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/postgres.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
 
     command: [ "postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_statement=${POSTGRES_LOG_STATEMENT:-none}", "-c", "log_min_duration_statement=${POSTGRES_LOG_MIN_DURATION:-1000}", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}", "-c", "log_connections=on", "-c", "log_disconnections=on" ]
 
@@ -78,17 +78,39 @@ services:
     networks:
       - project_network
 
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────
+  # Vault volume permissions (run before vault; hashicorp/vault image runs as UID 100, GID 1000)
+  # ─────────────────────────────────────────────
+  vault-data-init:
+    image: alpine:3.19
+    container_name: vault-data-init
+    restart: "no"
+    volumes:
+      - vault_data:/vault/data
+      - vault_logs:/vault/logs
+    user: root
+    command: ["sh", "-c", "chown -R 100:1000 /vault/data /vault/logs"]
+    networks:
+      - project_network
+
   # ─────────────────────────────────────────────
   # HashiCorp Vault (production / server mode)
   # ─────────────────────────────────────────────
   vault:
     image: hashicorp/vault:latest
     container_name: hashicorp-vault
+    depends_on:
+      vault-data-init:
+        condition: service_completed_successfully
     environment:
       VAULT_ADDR: "http://0.0.0.0:8200"          # Used by the vault CLI inside the container
       VAULT_API_ADDR: "http://vault:8200"         # Advertised API address (use HTTPS + real hostname in prod)
       VAULT_CLUSTER_ADDR: "https://vault:8201"
-      VAULT_DEV_ROOT_TOKEN_ID: "97cbac64-5909-423a-b029-75b9de473be0"
+      # VAULT_DEV_ROOT_TOKEN_ID only applies to "vault server -dev"; not used in server mode — root token comes from init.
     restart: unless-stopped
     cap_add:
       - IPC_LOCK
@@ -96,50 +118,87 @@ services:
       - "8200:8200"
       - "8201:8201"
     volumes:
-      - ./vault/config:/vault/config:ro
+      # Config mounted rw so image entrypoint can chown; policies/scripts stay ro
+      - ./vault/config:/vault/config
       - ./vault/policies:/vault/policies:ro
+      - ./vault/scripts:/vault/scripts:ro
       - vault_data:/vault/data
       - vault_logs:/vault/logs
+      - vault_agent_sink:/vault/agent
     command: vault server -config=/vault/config/vault.hcl
     env_file:
       - ../env/.env.shared
       - ../env/.env.dev
     healthcheck:
-      # vault status returns 0 (active), 1 (error), 2 (sealed) — treat sealed as unhealthy
-      test: [ "CMD-SHELL", "vault status | grep -q 'Sealed.*false'" ]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 15s
-      networks:
-        - project_network
-      security_opt:
-        - no-new-privileges:true
-      logging:
-        driver: json-file
-        options:
-          max-size: "100m"
-          max-file: "5"
-      deploy:
-        resources:
-          limits:
-            cpus: "0.5"
-            memory: 512M
-          reservations:
-            cpus: "0.25"
-            memory: 256M
+      # We check for initialized=true OR false (basically "is it running?")
+      # This allows vault-init to see if it needs to initialize or just unseal.
+      test: [ "CMD-SHELL", "vault status -format=json | grep -q 'initialized'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - project_network
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+  # ─────────────────────────────────────────────
+  # Vault Init (One-off bootstrap)
+  # ─────────────────────────────────────────────
+  vault-init:
+    image: hashicorp/vault:latest
+    container_name: vault-init
+    depends_on:
+      vault:
+        condition: service_healthy
+    volumes:
+      - ./vault/scripts:/vault/scripts:ro
+      - ./vault/policies:/vault/policies:ro
+      - vault_agent_sink:/vault/agent
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      INIT_OUTPUT_FILE: "/vault/agent/vault-init-keys.json"
+      AGENT_DIR: "/vault/agent"
+      # Pass DB env vars for secret writing
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    env_file:
+      - ../env/.env.shared
+      - ../env/.env.dev
+      - ../env/.env.secrets
+    entrypoint: [ "/bin/sh", "-c", "apk add --no-cache jq curl && /vault/scripts/init-vault.sh" ]
+    networks:
+      - project_network
+
   # ─────────────────────────────────────────────
   # Vault Agent  (sidecar for your Spring Boot app)
   # Optional but recommended — manages token renewal
   # and secret injection transparently
   # ─────────────────────────────────────────────
   vault-agent:
-    image: hashicorp/vault:1.17.2
+    image: hashicorp/vault:latest
     container_name: vault-agent
     restart: unless-stopped
     depends_on:
-      - vault:
-          condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
     cap_add:
       - IPC_LOCK
     volumes:
@@ -160,6 +219,8 @@ services:
         max-file: "3"
 
 volumes:
+  pgadmin_volume:
+    driver: local
   vault_data:
     driver: local
   vault_logs:

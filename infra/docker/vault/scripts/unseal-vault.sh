@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-VAULT_ADDR="http://localhost:8200"
-INIT_OUTPUT_FILE="./vault-init-keys.json"
+VAULT_ADDR="${VAULT_ADDR:-http://localhost:8200}"
+INIT_OUTPUT_FILE="${INIT_OUTPUT_FILE:-./vault-init-keys.json}"
 
 if [ ! -f "${INIT_OUTPUT_FILE}" ]; then
   echo "ERROR: ${INIT_OUTPUT_FILE} not found. Run init-vault.sh first."
