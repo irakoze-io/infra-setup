@@ -92,8 +92,9 @@ services:
     volumes:
       - vault_data:/vault/data
       - vault_logs:/vault/logs
+      - vault_agent_sink:/vault/agent
     user: root
-    command: ["sh", "-c", "chown -R 100:1000 /vault/data /vault/logs"]
+    command: ["sh", "-c", "chown -R 100:1000 /vault/data /vault/logs /vault/agent"]
     networks:
       - project_network
 
@@ -173,6 +174,8 @@ services:
       - vault_agent_sink:/vault/agent
     environment:
       VAULT_ADDR: "http://vault:8200"
+      # Writable HOME so Vault CLI can write ~/.vault.log (avoids "Unable to open log: Permission denied")
+      HOME: "/tmp"
       INIT_OUTPUT_FILE: "/vault/agent/vault-init-keys.json"
       AGENT_DIR: "/vault/agent"
       # Pass DB env vars for secret writing
@@ -201,6 +204,7 @@ services:
         condition: service_completed_successfully
     cap_add:
       - IPC_LOCK
+      - CAP_SETFCAP
     volumes:
       - ./vault/config/agent.hcl:/vault/config/agent.hcl:ro
       - vault_agent_sink:/vault/agent                   # Token sink shared with Spring Boot
@@ -210,8 +214,7 @@ services:
     command: vault agent -config=/vault/config/agent.hcl
     networks:
       - project_network
-    security_opt:
-      - no-new-privileges:true
+    # no-new-privileges removed so Vault agent can set CAP_SETFCAP (required by binary); cap_add limits what it can use
     logging:
       driver: json-file
       options:

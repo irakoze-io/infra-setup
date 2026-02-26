@@ -94,7 +94,8 @@ vault write auth/approle/role/spring-boot-role \
   secret_id_num_uses=0          # 0 = unlimited uses
 
 # ── 9. Export AppRole credentials for Vault Agent ──
-mkdir -p "${AGENT_DIR}"
+# Note: AGENT_DIR should have correct permissions (set by vault-data-init)
+mkdir -p "${AGENT_DIR}" || true
 
 ROLE_ID=$(vault read -field=role_id auth/approle/role/spring-boot-role/role-id)
 SECRET_ID=$(vault write -field=secret_id -f auth/approle/role/spring-boot-role/secret-id)
