@@ -207,11 +207,22 @@ services:
       - CAP_SETFCAP
     volumes:
       - ./vault/config/agent.hcl:/vault/config/agent.hcl:ro
+      - ./vault/config/templates:/vault/config/templates:ro
+      - ./vault/scripts/start-vault-agent.sh:/vault/scripts/start-vault-agent.sh:ro
       - vault_agent_sink:/vault/agent                   # Token sink shared with Spring Boot
       - vault_logs:/vault/logs
     environment:
       VAULT_ADDR: "http://vault:8200"
-    command: vault agent -config=/vault/config/agent.hcl
+      # Optional fallback for platforms where role_id/secret_id files are not pre-seeded.
+      # VAULT_ROLE_ID: "${VAULT_ROLE_ID}"
+      # VAULT_SECRET_ID: "${VAULT_SECRET_ID}"
+    # command: ["/bin/sh", "/vault/scripts/start-vault-agent.sh"]
+    healthcheck:
+      test: [ "CMD-SHELL", "test -s /vault/agent/token" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - project_network
     # no-new-privileges removed so Vault agent can set CAP_SETFCAP (required by binary); cap_add limits what it can use
