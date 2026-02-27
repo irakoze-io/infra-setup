@@ -103,6 +103,8 @@ SECRET_ID=$(vault write -field=secret_id -f auth/approle/role/spring-boot-role/s
 echo "${ROLE_ID}"   > "${AGENT_DIR}/role_id"
 echo "${SECRET_ID}" > "${AGENT_DIR}/secret_id"
 chmod 600 "${AGENT_DIR}/role_id" "${AGENT_DIR}/secret_id"
+# So vault-agent (UID 100, GID 1000) can read them
+chown 100:1000 "${AGENT_DIR}/role_id" "${AGENT_DIR}/secret_id" 2>/dev/null || true
 
 echo ""
 echo "✅ Vault bootstrap complete."
