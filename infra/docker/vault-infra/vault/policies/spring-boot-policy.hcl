@@ -1,19 +1,12 @@
-# Read-only access to application secrets
-path "secret/data/myapp/*" {
-  capabilities = ["read", "list"]
-}
-
-# Allow reading secret metadata
-path "secret/metadata/myapp/*" {
-  capabilities = ["read", "list"]
-}
-
-# Allow the app to renew its own token
-path "auth/token/renew-self" {
-  capabilities = ["update"]
-}
-
-# Allow the app to look up its own token info
-path "auth/token/lookup-self" {
+# KV v2 — read application secrets
+path "secret/data/myapp/spring" {
   capabilities = ["read"]
 }
+path "secret/metadata/myapp/spring" {
+  capabilities = ["read", "list"]
+}
+
+# Token self-management
+path "auth/token/renew-self" { capabilities = ["update"] }
+path "auth/token/lookup-self" { capabilities = ["read"] }
+path "auth/token/revoke-self" { capabilities = ["update"] }
