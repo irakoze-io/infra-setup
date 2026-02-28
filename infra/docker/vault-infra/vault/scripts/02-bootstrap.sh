@@ -47,10 +47,10 @@ vault secrets enable -path=secret kv-v2 \
 # ── 4. Write initial secrets ─────────────────────────────────────
 echo "▶ Writing initial secrets..."
 
-vault kv put secret/myapp/spring \
-  db_name="spring_db" \
-  db_username="spring_user" \
-  db_password="$(openssl rand -hex 20)" \
+vault kv put secret/iown-service/spring \
+  db_name="nirva" \
+  db_username="postgres" \
+  db_password="18fc6b68bb51f081436ddeaf9107d91c745d01f9" \
   jwt_secret="$(openssl rand -hex 32)" \
   external_api_key="$(openssl rand -hex 16)"
 
@@ -70,9 +70,9 @@ vault kv put secret/myapp/node \
 
 # ── 5. Write policies ────────────────────────────────────────────
 echo "▶ Writing policies..."
-vault policy write spring-boot-policy /vault/policies/spring-boot-policy.hcl
-vault policy write python-policy      /vault/policies/python-policy.hcl
-vault policy write node-policy        /vault/policies/node-policy.hcl
+vault policy write spring-boot-policy ../policies/spring-boot-policy.hcl
+vault policy write python-policy      ../policies/python-policy.hcl
+vault policy write node-policy        ../policies/node-policy.hcl
 
 # ── 6. Enable AppRole auth ───────────────────────────────────────
 echo "▶ Enabling AppRole auth method..."
@@ -129,14 +129,14 @@ docker run --rm \
   busybox sh -c "cp /source/role_id /target/role_id && cp /source/secret_id /target/secret_id"
 
 # ── 9. Revoke root token ──────────────────────────────────────────
-echo ""
-echo "════════════════════════════════════════════════"
-echo "  ▶ Revoking root token (production hardening)"
-echo "════════════════════════════════════════════════"
-vault token revoke "${ROOT_TOKEN}"
-unset VAULT_TOKEN
-echo "  Root token revoked. Use AppRole or operator"
-echo "  break-glass procedure to re-establish access."
+#echo ""
+#echo "════════════════════════════════════════════════"
+#echo "  ▶ Revoking root token (production hardening)"
+#echo "════════════════════════════════════════════════"
+#vault token revoke "${ROOT_TOKEN}"
+#unset VAULT_TOKEN
+#echo "  Root token revoked. Use AppRole or operator"
+#echo "  break-glass procedure to re-establish access."
 
 echo ""
 echo "✅ Bootstrap complete."

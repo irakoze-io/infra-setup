@@ -45,3 +45,5 @@ agent-sinks/
 # OS
 .DS_Store
 Thumbs.db
+/infra/docker/vault-infra/VAULT-SPRING-BOOT-INTEGRATION.md
+/infra/docker/vault-infra/vault/scripts/vault-agent-creds/

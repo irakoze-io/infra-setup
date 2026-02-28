@@ -140,6 +140,36 @@ services:
         reservations:
           cpus: "0.1"
           memory: 64M
+
+  # ──────────────────────────────────────────────────────────────
+  #  SPRING BOOT APP (iown-service)
+  #  Mount vault_agent_sinks at /vault/sinks so Spring Cloud Vault
+  #  can read the token from /vault/sinks/token (see bootstrap.properties).
+  #  Build image first: cd app && mvn spring-boot:build-image -Dspring-boot.build-image.imageName=iown-service:latest
+  # ──────────────────────────────────────────────────────────────
+  spring-boot-app:
+    image: iown-service:latest
+    container_name: spring-boot-app
+    restart: unless-stopped
+
+    depends_on:
+      vault-agent:
+        condition: service_started
+
+    environment:
+      VAULT_AGENT_HOST: vault-agent
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+
+    volumes:
+      - vault_agent_sinks:/vault/sinks:ro
+
+    networks:
+      - vault_net
+
+    ports:
+      - "${SPRING_PORT:-8080}:8080"
+
 # ══════════════════════════════════════════════════════════════════
 #  VOLUMES
 # ══════════════════════════════════════════════════════════════════

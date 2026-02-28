@@ -1,0 +1,3 @@
+[submodule "iownservice"]
+	path = iownservice
+	url = https://github.com/irakoze-io/iown-service.git
