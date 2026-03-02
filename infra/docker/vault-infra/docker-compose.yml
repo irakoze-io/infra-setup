@@ -11,6 +11,8 @@ services:
   #  and cannot write to those directories without this fix.
   #  This container runs once, fixes ownership, then exits.
   #  Vault and vault-agent both depend on it before starting.
+  #  vault-agent-sinks is a bind mount so the token is on the host for
+  #  local Spring Boot (see VAULT-SPRING-BOOT-INTEGRATION.md).
   # ──────────────────────────────────────────────────────────────
   infra-init-perms:
     image: busybox:1.36
@@ -26,6 +28,7 @@ services:
         chown -R 100:1000 /vault/logs
         chown -R 100:1000 /vault/tls
         chown -R 100:1000 /vault/agent/creds
+        mkdir -p /vault/agent/sinks
         chown -R 100:1000 /vault/agent/sinks
         chmod 750 /vault/data /vault/logs /vault/agent/sinks
         chmod 700 /vault/agent/creds
@@ -35,7 +38,7 @@ services:
       - vault_logs:/vault/logs
       - vault_tls:/vault/tls
       - vault_agent_creds:/vault/agent/creds
-      - vault_agent_sinks:/vault/agent/sinks
+      - ./vault-agent-sinks:/vault/agent/sinks
 
     networks:
       - vault_net
@@ -112,6 +115,9 @@ services:
     cap_add:
       - IPC_LOCK
 
+    ports:
+      - "${VAULT_AGENT_PORT:-8100}:8100"        # Expose for local Spring Boot (localhost:8100)
+
     environment:
       VAULT_ADDR: "http://vault:8200"
 
@@ -119,7 +125,7 @@ services:
       - ./vault/config/agent.hcl:/vault/config/agent.hcl:ro
       - ./vault/templates:/vault/templates:ro
       - vault_agent_creds:/vault/agent/creds:ro  # role_id + secret_id written by bootstrap script
-      - vault_agent_sinks:/vault/agent/sinks     # Rendered secrets; services read from here
+      - ./vault-agent-sinks:/vault/agent/sinks   # Bind mount: token on host for local Spring Boot
       - vault_logs:/vault/logs
 
     command: vault agent -config=/vault/config/agent.hcl
@@ -141,35 +147,6 @@ services:
           cpus: "0.1"
           memory: 64M
 
-  # ──────────────────────────────────────────────────────────────
-  #  SPRING BOOT APP (iown-service)
-  #  Mount vault_agent_sinks at /vault/sinks so Spring Cloud Vault
-  #  can read the token from /vault/sinks/token (see bootstrap.properties).
-  #  Build image first: cd app && mvn spring-boot:build-image -Dspring-boot.build-image.imageName=iown-service:latest
-  # ──────────────────────────────────────────────────────────────
-  spring-boot-app:
-    image: iown-service:latest
-    container_name: spring-boot-app
-    restart: unless-stopped
-
-    depends_on:
-      vault-agent:
-        condition: service_started
-
-    environment:
-      VAULT_AGENT_HOST: vault-agent
-      DB_HOST: ${DB_HOST:-db}
-      DB_PORT: ${DB_PORT:-5432}
-
-    volumes:
-      - vault_agent_sinks:/vault/sinks:ro
-
-    networks:
-      - vault_net
-
-    ports:
-      - "${SPRING_PORT:-8080}:8080"
-
 # ══════════════════════════════════════════════════════════════════
 #  VOLUMES
 # ══════════════════════════════════════════════════════════════════
@@ -184,9 +161,6 @@ volumes:
     driver: local
 
   vault_agent_creds: # role_id + secret_id — written by bootstrap
-    driver: local
-
-  vault_agent_sinks: # Rendered secrets files — shared with services
     driver: local
 
 # ══════════════════════════════════════════════════════════════════

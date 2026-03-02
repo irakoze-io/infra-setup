@@ -38,8 +38,9 @@ data/*.csv
 vault-init-keys.json
 vault/agent/creds/
 
-# Rendered secret files
+# Rendered secret files (Vault agent sinks — token + secrets on host for local Spring Boot)
 agent-sinks/
+infra/docker/vault-infra/vault-agent-sinks/
 *.env.secrets
 
 # OS
