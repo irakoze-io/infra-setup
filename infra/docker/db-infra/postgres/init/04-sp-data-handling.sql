@@ -350,7 +350,7 @@ create function public.sp_log_user_session(p_userid bigint, p_ipaddress characte
 as
 $$
 begin
-    insert into "sessions" ("userId", "ipAddress")
+    insert into "sessions" ("user_id", "ip_address")
     values (p_userId, p_ipAddress);
 exception
     when others then
@@ -378,7 +378,7 @@ declare
     v_username varchar(50);
 begin
     -- Generate ID with next sequence
-    select coalesce(max("userId"), 0) + 1 into v_userId from "users";
+    select coalesce(max("user_id"), 0) + 1 into v_userId from "users";
 
     -- Validate input parameters
     if p_firstname is null
@@ -403,7 +403,7 @@ begin
     if p_customerId is not null
         and not exists (select 1
                         from customers
-                        where "customerId" = p_customerId) then
+                        where "customer_id" = p_customerId) then
         return query
             select false,
                    'Customer does not exist',
@@ -422,12 +422,12 @@ begin
         return;
     end if;
 
-    insert into "users" ("userId",
-                         "firstName",
-                         "lastName",
-                         "customerId",
+    insert into "users" ("user_id",
+                         "first_name",
+                         "last_name",
+                         "customer_id",
                          "username",
-                         "passwordHash",
+                         "password",
                          "role")
     values (v_userId,
             p_firstname,
@@ -498,10 +498,10 @@ begin
     --         from "users"
     --         where "username" = lower(p_username);
     update "users"
-    set "lastLogin" = now()
+    set "last_login_time" = now()
     where "username" = lower(p_username)
-      and "passwordHash" = crypt(p_password, "passwordHash")
-    returning "userId", "lastLogin", "role"
+      and "password" = crypt(p_password, "password")
+    returning "user_id", "last_login_time", "role"
         into v_userId, v_lastLogin, v_role;
 
     if found then
@@ -557,7 +557,7 @@ $$
 declare
     v_customerId bigint;
 begin
-    select coalesce(max("customerId"), 0) + 1 into v_customerId from customers;
+    select coalesce(max("customer_id"), 0) + 1 into v_customerId from customers;
     if p_account is null
         or p_firstname is null
         or p_lastname is null
@@ -584,17 +584,17 @@ begin
         return;
     end if;
 
-    insert into customers ("customerId",
+    insert into customers ("customer_id",
                            account,
-                           "firstName",
-                           "lastName",
+                           "first_name",
+                           "last_name",
                            msisdn,
                            "gender",
-                           "dateOfBirth",
-                           "homeAddress",
+                           "dob",
+                           "address",
                            "city",
-                           "postalCode",
-                           "houseHoldId")
+                           "postal_code",
+                           "house_hold_id")
     values (v_customerId,
             p_account,
             p_firstname,
@@ -634,7 +634,7 @@ begin
 
     if exists(select 1
               from customers
-              where "customerId" = "p_customerId"
+              where "customer_id" = "p_customerId"
                 and account = "p_accountNumber")
     then
         return query select false, 'The account is already in use';
@@ -643,8 +643,8 @@ begin
 
     if exists(select 1
               from "customerAccount"
-              where "customerId" = "p_customerId"
-                and "accountNumber" = "p_accountNumber")
+              where "customer_id" = "p_customerId"
+                and "account_number" = "p_accountNumber")
     then
         return query select false,
                             'The account is already assigned to the customer. Please choose from available list.';
@@ -652,21 +652,21 @@ begin
 
     update "customers"
     set account = "p_accountNumber"
-    where "customerId" = "p_customerId"
-    returning "customerId" into v_existing_account;
+    where "customer_id" = "p_customerId"
+    returning "customer_id" into v_existing_account;
 
     if found then
         raise log 'Success';
 
-        if exists(select 1 from "customerAccount" where "customerId" = "p_customerId") then
-            update "customerAccount" set active = false where "customerId" = "p_customerId";
-            insert into "customerAccount" ("customerId", "bankName", "accountNumber", active)
+        if exists(select 1 from "customerAccount" where "customer_id" = "p_customerId") then
+            update "customerAccount" set active = false where "customer_id" = "p_customerId";
+            insert into "customerAccount" ("customer_id", "bank_name", "account_number", active)
             values ("p_customerId", "p_bankName", "p_accountNumber", false);
             return query
                 select true, 'Operation successful';
             return;
         end if;
-        insert into "customerAccount" ("customerId", "bankName", "accountNumber", active)
+        insert into "customerAccount" ("customer_id", "bank_name", "account_number", active)
         values ("p_customerId", '', v_existing_account, false),
                ("p_customerId", "p_bankName", "p_accountNumber", false);
         return query
@@ -696,8 +696,8 @@ $$
 begin
     update "customerAccount"
     set active = true
-    where "customerId" = "p_customerId"
-      and "accountNumber" = "p_accountNumber";
+    where "customer_id" = "p_customerId"
+      and "account_number" = "p_accountNumber";
 
     if found then
         return query select true, 'Operation successful';
