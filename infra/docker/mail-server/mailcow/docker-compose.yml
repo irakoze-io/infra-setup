@@ -1,0 +1,13 @@
+version: '3.0'
+
+services:
+    unbound-mailcow:
+        image: ghcr.io/mailcow/unbound:latest
+        container_name: unbound-mailcow
+        restart: unless-stopped
+        networks:
+            - mailcow-network
+        environment:
+            - TZ=${TZ}
+            - PUID=${PUID}
+            - SKIP_UNBOUND_HEALTHCHECK=${SKIP_UNBOUND_HEALTHCHECK:-n}
