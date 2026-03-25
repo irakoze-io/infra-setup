@@ -1,0 +1,39 @@
+version: '3'
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    restart: always
+    hostname: 'your_gitlab_hostname' # Replace with your host's IP or a domain name
+    ports:
+      - "80:80"
+      - "443:443"
+      - "22:22" # Note: use a different host port if port 22 is in use, e.g., "222:22"
+    volumes:
+      - ./gitlab/config:/etc/gitlab
+      - ./gitlab/logs:/var/log/gitlab
+      - ./gitlab/data:/var/opt/gitlab
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://your_gitlab_hostname'
+        # Optional: Set the initial root password here (e.g., 'your_password')
+        # gitlab_rails['initial_root_password'] = "your_password" 
+    networks:
+      - gitlab-network
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:latest
+    container_name: gitlab-runner
+    restart: always
+    depends_on:
+      - gitlab
+    volumes:
+      - ./gitlab-runner/config:/etc/gitlab-runner
+      # Mount the Docker socket to run jobs in Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gitlab-network
+
+networks:
+  gitlab-network:
+    driver: bridge
