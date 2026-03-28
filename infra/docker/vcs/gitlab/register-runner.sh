@@ -20,19 +20,22 @@ if [[ -z "${TOKEN}" ]]; then
 fi
 
 # Load vars
+# Load vars
 source .env
 GITLAB_HTTP_PORT="${GITLAB_HTTP_PORT:-8929}"
-GITLAB_HOSTNAME="${GITLAB_HOSTNAME:-localhost}"
+# Use the container name 'gitlab' for internal network communication
+GITLAB_CONTAINER_NAME="gitlab"
 
 docker exec -it gitlab-runner gitlab-runner register \
   --non-interactive \
-  --url "http://${GITLAB_HOSTNAME}:${GITLAB_HTTP_PORT}" \
+  --url "http://${GITLAB_CONTAINER_NAME}:${GITLAB_HTTP_PORT}" \
   --token "${TOKEN}" \
   --executor "docker" \
   --docker-image "alpine:latest" \
   --description "local-docker-runner" \
   --docker-network-mode "gitlab-net" \
   --docker-volumes "/var/run/docker.sock:/var/run/docker.sock"
+
 
 echo ""
 echo "✓ Runner registered. Verify in Admin → CI/CD → Runners."
