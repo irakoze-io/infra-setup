@@ -1,3 +1,5 @@
+.DS_Store
+
 # Node.js
 node_modules/
 npm-debug.log*
@@ -14,7 +16,6 @@ __pycache__/
 *.ipynb_checkpoints
 
 # macOS
-.DS_Store
 
 # JetBrains IDEs
 .idea/
@@ -38,10 +39,15 @@ data/*.csv
 vault-init-keys.json
 vault/agent/creds/
 
-# Rendered secret files
+# Rendered secret files (Vault agent sinks — token + secrets on host for local Spring Boot)
 agent-sinks/
+infra/docker/vault-infra/vault-agent-sinks/
 *.env.secrets
 
 # OS
-.DS_Store
+infra/.DS_Store
+infra/docker/.DS_Store
 Thumbs.db
+/infra/docker/vault-infra/VAULT-SPRING-BOOT-INTEGRATION.md
+/infra/docker/vault-infra/vault/scripts/vault-agent-creds/
+/infra/docker/vcs/postgres/

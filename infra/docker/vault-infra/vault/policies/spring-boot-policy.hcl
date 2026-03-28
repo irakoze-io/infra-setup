@@ -1,8 +1,8 @@
 # KV v2 — read application secrets
-path "secret/data/myapp/spring" {
+path "secret/data/iown-service/spring" {
   capabilities = ["read"]
 }
-path "secret/metadata/myapp/spring" {
+path "secret/metadata/iown-service/spring" {
   capabilities = ["read", "list"]
 }
 

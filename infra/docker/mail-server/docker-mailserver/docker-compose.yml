@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: mail
+    domainname: example.com
+    container_name: mailserver
+    ports:
+      - "25:25"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - ./maildata:/var/mail
+      - ./mailstate:/var/mail-state
+      - ./config:/tmp/docker-mailserver
+    environment:
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_CLAMAV=1
+      - ENABLE_FAIL2BAN=1
