@@ -1,39 +1,66 @@
-version: '3'
 services:
   gitlab:
-    image: gitlab/gitlab-ce:latest
+    image: ${GITLAB_IMAGE:-gitlab/gitlab-ce:latest}
     container_name: gitlab
     restart: always
-    hostname: 'your_gitlab_hostname' # Replace with your host's IP or a domain name
+    hostname: ${GITLAB_HOSTNAME:-localhost}
     ports:
-      - "80:80"
-      - "443:443"
-      - "22:22" # Note: use a different host port if port 22 is in use, e.g., "222:22"
+      - "${GITLAB_HTTP_PORT:-8929}:${GITLAB_HTTP_PORT:-8929}"
+      - "${GITLAB_HTTPS_PORT:-8443}:${GITLAB_HTTPS_PORT:-8443}"
+      - "${GITLAB_SSH_PORT:-2424}:22"
     volumes:
-      - ./gitlab/config:/etc/gitlab
-      - ./gitlab/logs:/var/log/gitlab
-      - ./gitlab/data:/var/opt/gitlab
+      - ${GITLAB_HOME}/config:/etc/gitlab
+      - ${GITLAB_HOME}/logs:/var/log/gitlab
+      - ${GITLAB_HOME}/data:/var/opt/gitlab
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url 'http://your_gitlab_hostname'
-        # Optional: Set the initial root password here (e.g., 'your_password')
+        external_url 'http://${GITLAB_HOSTNAME:-localhost}:${GITLAB_HTTP_PORT:-8929}'
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-2424}
+        # Optimization for small personal instance
+        puma['worker_processes'] = 2
+        sidekiq['max_concurrency'] = 10
+        # Timezone
+        gitlab_rails['time_zone'] = 'UTC'
+        # Optional: Set the initial root password here
         # gitlab_rails['initial_root_password'] = "your_password" 
+    healthcheck:
+      test: ["CMD", "/opt/gitlab/bin/gitlab-healthcheck", "--silent"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
     networks:
-      - gitlab-network
+      - gitlab-net
 
   gitlab-runner:
-    image: gitlab/gitlab-runner:latest
+    image: ${GITLAB_RUNNER_IMAGE:-gitlab/gitlab-runner:latest}
     container_name: gitlab-runner
     restart: always
     depends_on:
-      - gitlab
+      gitlab:
+        condition: service_healthy
     volumes:
-      - ./gitlab-runner/config:/etc/gitlab-runner
-      # Mount the Docker socket to run jobs in Docker
+      - ${GITLAB_HOME}/runner/config:/etc/gitlab-runner
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "gitlab-runner status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
-      - gitlab-network
+      - gitlab-net
 
 networks:
-  gitlab-network:
+  gitlab-net:
+    name: gitlab-net
     driver: bridge
